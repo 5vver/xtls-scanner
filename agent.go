@@ -20,4 +20,4 @@ type BaseAgent struct {
 	TaskChan <-chan ScanTask
 }
 
-// func (ba *BaseAgent) Run() {}
+func (ba *BaseAgent) Run() {}

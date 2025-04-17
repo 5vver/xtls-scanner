@@ -1,13 +1,23 @@
 package main
 
-import "sync"
+import (
+	"net"
+	"sync"
+)
+
+type Host struct {
+	IP     net.IP
+	Port   int
+	Origin string
+}
 
 type AppState struct {
-	mu     sync.RWMutex
-	Tasks  map[string]bool
-	Host   string
-	Output map[string]AgentOutput
-	Stop   bool
+	mu      sync.RWMutex
+	Tasks   map[string]bool
+	Host    Host
+	Timeout int
+	Output  map[string]AgentOutput
+	Stop    bool
 }
 
 func NewAppState() *AppState {
@@ -23,10 +33,16 @@ func (as *AppState) SetTask(task string, enabled bool) {
 	as.Tasks[task] = enabled
 }
 
-func (as *AppState) SetHost(host string) {
+func (as *AppState) SetHost(host Host) {
 	as.mu.Lock()
 	defer as.mu.Unlock()
 	as.Host = host
+}
+
+func (as *AppState) SetTimeout(timeout int) {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+	as.Timeout = timeout
 }
 
 func (as *AppState) SetAgentOutput(agentID string, status AgentStatus, data map[string]interface{}) {

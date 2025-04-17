@@ -4,6 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
+	"net/netip"
+	"regexp"
+	"strings"
 )
 
 type ScanTask struct {
@@ -11,6 +15,8 @@ type ScanTask struct {
 	TCPEnabled bool
 	URLEnabled bool
 	Host       string
+	Port       int
+	Timeout    int
 }
 
 type IOAgent struct {
@@ -18,8 +24,7 @@ type IOAgent struct {
 	taskChan chan ScanTask
 }
 
-func NewIOAgent(appState *AppState) *IOAgent {
-	taskChan := make(chan ScanTask, 10)
+func NewIOAgent(appState *AppState, taskChan chan ScanTask) *IOAgent {
 	return &IOAgent{
 		BaseAgent: BaseAgent{
 			ID:       "io-supervisor",
@@ -30,11 +35,68 @@ func NewIOAgent(appState *AppState) *IOAgent {
 	}
 }
 
+func ParseHost(hostValue string, port int) (Host, error) {
+	host := strings.TrimSpace(hostValue)
+	if host == "" {
+		return Host{}, fmt.Errorf("Host must not be empty")
+	}
+
+	// Try parse ip
+	ip := net.ParseIP(host)
+	if ip != nil && (ip.To4() != nil) {
+		return Host{
+			IP:     ip,
+			Origin: host,
+			Port:   port,
+		}, nil
+	}
+
+	// Try parse CIDR
+	_, _, err := net.ParseCIDR(hostValue)
+	if err == nil {
+		// ip cidr
+		p, err := netip.ParsePrefix(hostValue)
+		if err != nil {
+			return Host{}, fmt.Errorf("Invalid CIDR %s", host)
+		}
+		p = p.Masked()
+		addr := p.Addr()
+		for {
+			if !p.Contains(addr) {
+				break
+			}
+			ip = net.ParseIP(addr.String())
+			if ip != nil {
+				return Host{
+					IP:     ip,
+					Origin: host,
+					Port:   port,
+				}, nil
+			}
+			addr = addr.Next()
+		}
+	}
+
+	// Try parse domain
+	r := regexp.MustCompile(`(?m)^[A-Za-z0-9\-.]+$`)
+	if r.MatchString(host) {
+		return Host{
+			IP:     nil,
+			Origin: host,
+			Port:   port,
+		}, nil
+	}
+
+	return Host{}, fmt.Errorf("host is not valid ip, cidr or domain: %s", host)
+}
+
 func (io *IOAgent) ParseArguments() (ScanTask, error) {
 	sni := flag.Bool("sni", false, "Enable SNI scanning")
 	tcp := flag.Bool("tcp", false, "Enable TCP port scanning")
 	url := flag.Bool("url", false, "Enable URL scanning")
-	host := flag.String("host", "", "Target IP or hostname")
+	host := flag.String("host", "", "Target IP, CIDR or hostname")
+	port := flag.Int("port", 443, "Target port")
+	timeout := flag.Int("timeout", 10, "Scan timeout")
 
 	flag.Parse()
 
@@ -46,16 +108,25 @@ func (io *IOAgent) ParseArguments() (ScanTask, error) {
 		return ScanTask{}, fmt.Errorf("at least one scan type (-sni, -tcp, -url) must be enabled")
 	}
 
+	parsedHost, err := ParseHost(*host, *port)
+	if err != nil {
+		return ScanTask{}, err
+	}
+	log.Println(parsedHost)
+
 	io.AppState.SetTask("sni", *sni)
 	io.AppState.SetTask("tcp", *tcp)
 	io.AppState.SetTask("url", *url)
-	io.AppState.SetHost(*host)
+	io.AppState.SetHost(parsedHost)
+	io.AppState.SetTimeout(*timeout)
 
 	return ScanTask{
 		SNIEnabled: *sni,
 		TCPEnabled: *tcp,
 		URLEnabled: *url,
 		Host:       *host,
+		Port:       *port,
+		Timeout:    *timeout,
 	}, nil
 }
 
@@ -83,4 +154,6 @@ func (io *IOAgent) Run() {
 			"url": task.URLEnabled,
 		},
 	})
+
+	close(io.taskChan)
 }
