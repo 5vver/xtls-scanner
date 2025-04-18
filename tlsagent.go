@@ -30,34 +30,34 @@ func LookupIP(addr string) (net.IP, error) {
 	return arr[0], nil
 }
 
-type TCPAgent struct {
+type TLSAgent struct {
 	BaseAgent
 }
 
-func NewTCPAgent(appState *AppState) *TCPAgent {
-	return &TCPAgent{
+func NewTCPAgent(appState *AppState) *TLSAgent {
+	return &TLSAgent{
 		BaseAgent: BaseAgent{
-			ID:       "tcp-scanner",
+			ID:       "tls",
 			AppState: appState,
 		},
 	}
 }
 
-func (sa *TCPAgent) Run(interval int) {
-	log.Printf("Starting %s Scanner Agent (%s)", "tcp", sa.ID)
+func (ta *TLSAgent) Run(interval int) {
+	log.Printf("Starting %s Scanner Agent", ta.ID)
 
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	defer ticker.Stop()
 
 	for {
-		if sa.AppState.Stop {
-			log.Println("[TCP] stopping")
+		if ta.AppState.Stop {
+			log.Println("[TLS] stopping")
 			break
 		}
 
-		taskChan := sa.AppState.GetChanTask("tcp")
+		taskChan := ta.AppState.GetChanTask("tls")
 		if taskChan == nil {
-			log.Println("TCP channel not initialized yet, waiting...")
+			log.Println("TLS channel not initialized yet, waiting...")
 			<-ticker.C
 			continue
 		}
@@ -71,16 +71,16 @@ func (sa *TCPAgent) Run(interval int) {
 
 			log.Println("Received task:", task)
 
-			sa.AppState.SetAgentOutput(sa.ID, AgentStatusRunning, nil)
+			ta.AppState.SetAgentOutput(ta.ID, AgentStatusRunning, nil)
 			host := task.Host
 			t := time.Now()
 
 			if host.IP == nil {
 				// log
-				log.Println("tcp processing host ip")
+				log.Println("tls processing host ip")
 				ip, err := LookupIP(host.Origin)
 				if err != nil {
-					sa.AppState.SetAgentOutput(sa.ID, AgentStatusFailed, nil)
+					ta.AppState.SetAgentOutput(ta.ID, AgentStatusFailed, nil)
 					log.Println(fmt.Errorf("Failed to get ip from origin %s. Error: %w", host.Origin, err))
 					return
 				}
@@ -89,21 +89,21 @@ func (sa *TCPAgent) Run(interval int) {
 
 			hostPort := net.JoinHostPort(host.IP.String(), strconv.Itoa(host.Port))
 			// log
-			log.Println("tcp setting dialtimeout")
-			log.Println("hostport", hostPort)
-			conn, err := net.DialTimeout("tcp", hostPort, time.Duration(sa.AppState.Timeout)*time.Second)
+			log.Println("tls setting dialtimeout")
+			log.Println("tls hostport", hostPort)
+			conn, err := net.DialTimeout("tcp", hostPort, time.Duration(ta.AppState.Timeout)*time.Second)
 			if err != nil {
-				sa.AppState.SetAgentOutput(sa.ID, AgentStatusFailed, nil)
+				ta.AppState.SetAgentOutput(ta.ID, AgentStatusFailed, nil)
 				log.Println(fmt.Errorf("Could not dial to target: %s", hostPort))
 				return
 			}
 
 			// log
-			log.Println("tcp setting deadline")
+			log.Println("tls setting deadline")
 			defer conn.Close()
-			err = conn.SetDeadline(time.Now().Add(time.Duration(sa.AppState.Timeout) * time.Second))
+			err = conn.SetDeadline(time.Now().Add(time.Duration(ta.AppState.Timeout) * time.Second))
 			if err != nil {
-				sa.AppState.SetAgentOutput(sa.ID, AgentStatusFailed, nil)
+				ta.AppState.SetAgentOutput(ta.ID, AgentStatusFailed, nil)
 				log.Println(fmt.Errorf("Error setting deadline %w", err))
 				return
 			}
@@ -117,19 +117,19 @@ func (sa *TCPAgent) Run(interval int) {
 			// Host is domain
 			if host.IP == nil {
 				// log
-				log.Println("tcp host is domain")
+				log.Println("tls host is domain")
 				tlsCfg.ServerName = host.Origin
 			}
 
 			// log
-			log.Println("tcp client handshake")
+			log.Println("tls client handshake")
 			c := tls.Client(conn, tlsCfg)
 			log.Println(c.ConnectionState())
 			err = c.Handshake()
 			if err != nil {
 				// log
 				log.Println("tcp client handshake error", fmt.Errorf("TLS handshake failed %w", err))
-				sa.AppState.SetAgentOutput(sa.ID, AgentStatusFailed, nil)
+				ta.AppState.SetAgentOutput(ta.ID, AgentStatusFailed, nil)
 				log.Println(fmt.Errorf("TLS handshake failed %w", err))
 				return
 			}
@@ -143,25 +143,25 @@ func (sa *TCPAgent) Run(interval int) {
 
 			if state.Version != tls.VersionTLS13 || alpn != "h2" || len(domain) == 0 || len(issuers) == 0 {
 				// log
-				log.Println("tcp not feasible")
+				log.Println("tls not feasible")
 				// not feasible
 				feasible = false
-				sa.AppState.SetAgentOutput(sa.ID, AgentStatusCompleted,
-					map[string]interface{}{
+				ta.AppState.SetAgentOutput(ta.ID, AgentStatusCompleted,
+					map[string]any{
 						"elapsed":  time.Since(t).String(),
 						"feasible": feasible,
 						"result":   "not feasible",
 					},
 				)
 				log.Println(
-					map[string]interface{}{
+					map[string]any{
 						"elapsed":  time.Since(t).String(),
 						"feasible": feasible,
 						"result":   "not feasible",
 					},
 				)
 			} else {
-				result := map[string]interface{}{
+				result := map[string]any{
 					"elapsed":  time.Since(t).String(),
 					"ip":       host.IP.String(),
 					"host":     host.Origin,
@@ -171,10 +171,9 @@ func (sa *TCPAgent) Run(interval int) {
 					"result":   fmt.Sprintf("%s scan completed", "sni"),
 				}
 				// log
-				log.Println("tcp result", result)
-				sa.AppState.SetAgentOutput(sa.ID, AgentStatusCompleted, result)
+				log.Println("tls result", result)
+				ta.AppState.SetAgentOutput(ta.ID, AgentStatusCompleted, result)
 			}
 		}
-
 	}
 }

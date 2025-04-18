@@ -12,7 +12,7 @@ import (
 
 type Arguments struct {
 	SNIEnabled  bool
-	TCPEnabled  bool
+	TLSEnabled  bool
 	PingEnabled bool
 	Host        Host
 	Timeout     int
@@ -88,7 +88,7 @@ func ParseHost(hostValue string, port int) (Host, error) {
 
 func ParseArguments() (Arguments, error) {
 	sni := flag.Bool("sni", false, "Enable SNI scanning")
-	tcp := flag.Bool("tcp", false, "Enable TCP port scanning")
+	tls := flag.Bool("tls", false, "Enable TLS host scanning")
 	ping := flag.Bool("ping", false, "Enable Ping scanning")
 	host := flag.String("host", "", "Target IP, CIDR or hostname")
 	port := flag.Int("port", 443, "Target port")
@@ -100,8 +100,8 @@ func ParseArguments() (Arguments, error) {
 		return Arguments{}, fmt.Errorf("host is required")
 	}
 
-	if !*sni && !*tcp && !*ping {
-		return Arguments{}, fmt.Errorf("at least one scan type (-sni, -tcp, -ping) must be enabled")
+	if !*sni && !*tls && !*ping {
+		return Arguments{}, fmt.Errorf("at least one scan type (-sni, -tls, -ping) must be enabled")
 	}
 
 	parsedHost, err := ParseHost(*host, *port)
@@ -111,7 +111,7 @@ func ParseArguments() (Arguments, error) {
 
 	return Arguments{
 		SNIEnabled:  *sni,
-		TCPEnabled:  *tcp,
+		TLSEnabled:  *tls,
 		PingEnabled: *ping,
 		Host:        parsedHost,
 		Timeout:     *timeout,
@@ -125,12 +125,12 @@ func (io *IOAgent) Run() {
 	args, err := ParseArguments()
 	if err != nil {
 		log.Printf("Error parsing arguments: %v", err)
-		io.AppState.SetAgentOutput(io.ID, AgentStatusFailed, map[string]interface{}{"error": err.Error()})
+		io.AppState.SetAgentOutput(io.ID, AgentStatusFailed, map[string]any{"error": err.Error()})
 		return
 	}
 
 	log.Printf("Scheduling task for host: %s, SNI: %v, TCP: %v, Ping: %v",
-		args.Host.Origin, args.SNIEnabled, args.TCPEnabled, args.PingEnabled)
+		args.Host.Origin, args.SNIEnabled, args.TLSEnabled, args.PingEnabled)
 
 	if args.PingEnabled {
 		log.Println("Creating and adding task for ping agent")
@@ -141,13 +141,13 @@ func (io *IOAgent) Run() {
 		}
 		io.AppState.AddChanTask("ping", task)
 	}
-	if args.TCPEnabled {
+	if args.TLSEnabled {
 		task := ScanTask{
-			Type:    "tcp",
+			Type:    "tls",
 			Host:    args.Host,
 			Timeout: args.Timeout,
 		}
-		io.AppState.AddChanTask("tcp", task)
+		io.AppState.AddChanTask("tls", task)
 	}
 	if args.SNIEnabled {
 		task := ScanTask{
@@ -158,11 +158,11 @@ func (io *IOAgent) Run() {
 		io.AppState.AddChanTask("sni", task)
 	}
 
-	io.AppState.SetAgentOutput(io.ID, AgentStatusCompleted, map[string]interface{}{
+	io.AppState.SetAgentOutput(io.ID, AgentStatusCompleted, map[string]any{
 		"host": args.Host,
 		"tasks": map[string]bool{
 			"sni":  args.SNIEnabled,
-			"tcp":  args.TCPEnabled,
+			"tcp":  args.TLSEnabled,
 			"ping": args.PingEnabled,
 		},
 	})

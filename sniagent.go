@@ -21,7 +21,6 @@ func NewSNIAgent(appState *AppState, taskChan <-chan ScanTask) *SNIAgent {
 
 func (sa *SNIAgent) Run() {
 	log.Printf("Starting %s Scanner Agent (%s)", "sni", sa.ID)
-	log.Printf("Should run sni %t", sa.AppState.ShouldExecute("sni"))
 
 	task, ok := <-sa.AppState.GetChanTask("ping")
 	if !ok {

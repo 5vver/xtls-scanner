@@ -11,7 +11,7 @@ const (
 
 type AgentOutput struct {
 	Status AgentStatus
-	Data   map[string]interface{}
+	Data   map[string]any
 }
 
 type BaseAgent struct {
