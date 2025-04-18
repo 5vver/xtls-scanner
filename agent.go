@@ -17,7 +17,7 @@ type AgentOutput struct {
 type BaseAgent struct {
 	ID       string
 	AppState *AppState
-	TaskChan <-chan ScanTask
+	// TaskChan <-chan ScanTask
 }
 
 func (ba *BaseAgent) Run() {}
