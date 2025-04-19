@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"sync"
 )
@@ -48,10 +48,10 @@ func (as *AppState) AddChanTask(key string, task ScanTask) error {
 
 	select {
 	case ch <- task:
-		log.Println("Added task for ", key)
+		slog.Debug("State channel received task", "key", key)
 		return nil
 	default:
-		return fmt.Errorf("channel for key %s is full", key)
+		return fmt.Errorf("Channel for key %s is full", key)
 	}
 }
 

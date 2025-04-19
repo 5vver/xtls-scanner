@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	probing "github.com/prometheus-community/pro-bing"
@@ -22,20 +22,20 @@ func NewPingAgent(appState *AppState) *PingAgent {
 }
 
 func (pa *PingAgent) Run(interval int) {
-	log.Printf("Starting %s Scanner Agent (%s) and listening for tasks..", "ping", pa.ID)
+	slog.Info("Starting Ping scanner agent and listening for tasks")
 
 	ticker := time.NewTicker(time.Duration(interval) * time.Second)
 	defer ticker.Stop()
 
 	for {
 		if pa.AppState.Stop {
-			log.Println("[PING] stopping")
+			slog.Debug("Stopping Ping agent")
 			break
 		}
 
 		taskChan := pa.AppState.GetChanTask(pa.ID)
 		if taskChan == nil {
-			log.Println("Ping channel not initialized yet, waiting...")
+			slog.Debug("Ping channel not initialized yet, waiting")
 			<-ticker.C
 			continue
 		}
@@ -43,32 +43,34 @@ func (pa *PingAgent) Run(interval int) {
 		select {
 		case task, ok := <-taskChan:
 			if !ok {
-				log.Println("Task channel closed, stopping agent")
+				slog.Debug("Task channel closed, stopping Ping agent")
 				return
 			}
 
-			log.Println("Received task:", task)
+			slog.Debug("Ping agent received task", "task", task)
+			slog.Info("Ping agent starts processing task, please stand by")
 
 			pa.AppState.SetAgentOutput(pa.ID, AgentStatusRunning, nil)
 
 			// hostPort := net.JoinHostPort(task.Host.IP.String(), strconv.Itoa(task.Host.Port))
 			pinger, err := probing.NewPinger(task.Host.Origin)
 			if err != nil {
-				log.Println(fmt.Errorf("Error creating pinger: %w", err))
+				slog.Error("Error creating pinger", "error", err)
 				pa.AppState.SetAgentOutput(pa.ID, AgentStatusFailed, nil)
 				return
 			}
 
 			pinger.OnRecv = func(pkt *probing.Packet) {
-				fmt.Printf("%d bytes from %s: icmp_seq=%d time=%v ttl=%v\n",
-					pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.TTL)
+				slog.Debug("Ping agent received bytes", "from", pkt.IPAddr, "amount", pkt.Nbytes, "icmp_seq",
+					pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
 			}
 			pinger.OnDuplicateRecv = func(pkt *probing.Packet) {
-				fmt.Printf("%d bytes from %s: icmp_seq=%d time=%v ttl=%v (DUP!)\n",
-					pkt.Nbytes, pkt.IPAddr, pkt.Seq, pkt.Rtt, pkt.TTL)
+				slog.Debug("Ping agent duplicate received bytes", "from", pkt.IPAddr, "amount", pkt.Nbytes, "icmp_seq",
+					pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
 			}
 			pinger.OnFinish = func(stats *probing.Statistics) {
 				pa.AppState.SetAgentOutput(pa.ID, AgentStatusCompleted, nil)
+				slog.Info("Ping agent finished work")
 				fmt.Printf("\n--- %s ping statistics ---\n", stats.Addr)
 				fmt.Printf("%d packets transmitted, %d packets received, %d duplicates, %v%% packet loss\n",
 					stats.PacketsSent, stats.PacketsRecv, stats.PacketsRecvDuplicates, stats.PacketLoss)
@@ -85,16 +87,16 @@ func (pa *PingAgent) Run(interval int) {
 			pinger.SetPrivileged(false)
 			pinger.SetTrafficClass(uint8(192))
 
-			fmt.Printf("PING %s (%s):\n", pinger.Addr(), pinger.IPAddr())
+			slog.Debug("Pinging", "addr", pinger.Addr(), "ip", pinger.IPAddr())
 			err = pinger.Run()
 			if err != nil {
 				pa.AppState.SetAgentOutput(pa.ID, AgentStatusFailed, nil)
-				fmt.Println("Failed to ping target host:", err)
+				slog.Error("Failed to ping target host", "error", err)
 				return
 			}
 
 		case <-ticker.C:
-			log.Println("[PING] No tasks available, waiting...")
+			slog.Debug("Ping agent no tasks available, waiting")
 		}
 	}
 }

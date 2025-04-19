@@ -3,9 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/netip"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -16,6 +17,7 @@ type Arguments struct {
 	PingEnabled bool
 	Host        Host
 	Timeout     int
+	Verbose     bool
 }
 
 type IOAgent struct {
@@ -93,6 +95,7 @@ func ParseArguments() (Arguments, error) {
 	host := flag.String("host", "", "Target IP, CIDR or hostname")
 	port := flag.Int("port", 443, "Target port")
 	timeout := flag.Int("timeout", 10, "Scan timeout")
+	verbose := flag.Bool("verbose", false, "Logging verbose level messages")
 
 	flag.Parse()
 
@@ -115,25 +118,25 @@ func ParseArguments() (Arguments, error) {
 		PingEnabled: *ping,
 		Host:        parsedHost,
 		Timeout:     *timeout,
+		Verbose:     *verbose,
 	}, nil
 }
 
 func (io *IOAgent) Run() {
-	log.Printf("Starting I/O Supervisor Agent (%s)", io.ID)
+	slog.Info("Starting I/O Supervisor agent")
 	io.AppState.SetAgentOutput(io.ID, AgentStatusRunning, nil)
 
 	args, err := ParseArguments()
 	if err != nil {
-		log.Printf("Error parsing arguments: %v", err)
+		slog.Error("Error parsing arguments", "error", err)
 		io.AppState.SetAgentOutput(io.ID, AgentStatusFailed, map[string]any{"error": err.Error()})
 		return
 	}
 
-	log.Printf("Scheduling task for host: %s, SNI: %v, TCP: %v, Ping: %v",
-		args.Host.Origin, args.SNIEnabled, args.TLSEnabled, args.PingEnabled)
+	slog.Info("Scheduling tasks for host", "host", args.Host.Origin)
 
 	if args.PingEnabled {
-		log.Println("Creating and adding task for ping agent")
+		slog.Debug("Creating and adding task for ping agent")
 		task := ScanTask{
 			Type:    "ping",
 			Host:    args.Host,
@@ -142,6 +145,7 @@ func (io *IOAgent) Run() {
 		io.AppState.AddChanTask("ping", task)
 	}
 	if args.TLSEnabled {
+		slog.Debug("Creating and adding task for tls agent")
 		task := ScanTask{
 			Type:    "tls",
 			Host:    args.Host,
@@ -150,12 +154,24 @@ func (io *IOAgent) Run() {
 		io.AppState.AddChanTask("tls", task)
 	}
 	if args.SNIEnabled {
+		slog.Debug("Creating and adding task for sni agent")
 		task := ScanTask{
 			Type:    "sni",
 			Host:    args.Host,
 			Timeout: args.Timeout,
 		}
 		io.AppState.AddChanTask("sni", task)
+	}
+
+	// Set log level
+	if args.Verbose {
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})))
+	} else {
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		})))
 	}
 
 	io.AppState.SetAgentOutput(io.ID, AgentStatusCompleted, map[string]any{
