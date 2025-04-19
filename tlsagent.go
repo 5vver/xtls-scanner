@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"math/big"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -47,10 +48,34 @@ func NextIP(ip net.IP, increment bool) net.IP {
 
 func AccumulateHost(origin string, port int, depth int) <-chan Host {
 	hostChan := make(chan Host)
+
 	_, _, err := net.ParseCIDR(origin)
 	if err == nil {
+		// Origin is CIDR
 		slog.Error("Origin is CIDR", "origin", origin)
-		return nil
+		p, err := netip.ParsePrefix(origin)
+		if err != nil {
+			slog.Warn("Invalid CIDR", "cidr", origin, "err", err)
+		}
+		if !p.Addr().Is4() {
+			return nil
+		}
+		p = p.Masked()
+		addr := p.Addr()
+		for {
+			if !p.Contains(addr) {
+				break
+			}
+			ip := net.ParseIP(addr.String())
+			if ip != nil {
+				hostChan <- Host{
+					IP:     ip,
+					Port:   port,
+					Origin: origin,
+				}
+			}
+			addr = addr.Next()
+		}
 	}
 
 	ip := net.ParseIP(origin)
@@ -219,7 +244,10 @@ func (ta *TLSAgent) Run(interval int) {
 			go func() {
 				for host := range hostChan {
 					slog.Debug("TLS scan host", "host", host)
-					TlsScan(host, task.Timeout)
+					result, err := TlsScan(host, task.Timeout)
+					if err == nil {
+						ta.AppState.SetAgentOutput(ta.ID, AgentStatusRunning, result)
+					}
 				}
 
 				ta.AppState.SetAgentOutput(ta.ID, AgentStatusCompleted, nil)

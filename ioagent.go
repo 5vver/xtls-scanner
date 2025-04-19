@@ -97,7 +97,7 @@ func ParseArguments() (Arguments, error) {
 	port := flag.Int("port", 443, "Target port")
 	timeout := flag.Int("timeout", 10, "Scan timeout")
 	verbose := flag.Bool("verbose", false, "Logging verbose level messages")
-	depth := flag.Int("depth", 10, "TLS ip addr traverse depth")
+	depth := flag.Int("depth", 10, "TLS ip addr crawl depth")
 
 	flag.Parse()
 

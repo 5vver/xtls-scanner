@@ -24,17 +24,17 @@ type ScanTask struct {
 type AppState struct {
 	mu         sync.RWMutex
 	AgentChans map[string]chan ScanTask
+	OutputChan chan AgentOutput
 	Host       Host
 	Timeout    int
 	Depth      int
-	Output     map[string]AgentOutput
 	Stop       bool
 }
 
 func NewAppState() *AppState {
 	return &AppState{
 		AgentChans: make(map[string]chan ScanTask, 10),
-		Output:     make(map[string]AgentOutput),
+		OutputChan: make(chan AgentOutput),
 	}
 }
 
@@ -85,15 +85,8 @@ func (as *AppState) SetTimeout(timeout int) {
 	as.Timeout = timeout
 }
 
-func (as *AppState) SetAgentOutput(agentID string, status AgentStatus, data map[string]any) {
+func (as *AppState) SetAgentOutput(id string, status AgentStatus, data map[string]any) {
 	as.mu.Lock()
 	defer as.mu.Unlock()
-	as.Output[agentID] = AgentOutput{Status: status, Data: data}
-}
-
-func (as *AppState) GetAgentOutput(agentID string) (AgentOutput, bool) {
-	as.mu.RLock()
-	defer as.mu.RUnlock()
-	output, exists := as.Output[agentID]
-	return output, exists
+	as.OutputChan <- AgentOutput{ID: id, Status: status, Data: data}
 }

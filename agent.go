@@ -10,6 +10,7 @@ const (
 )
 
 type AgentOutput struct {
+	ID     string
 	Status AgentStatus
 	Data   map[string]any
 }
@@ -17,7 +18,6 @@ type AgentOutput struct {
 type BaseAgent struct {
 	ID       string
 	AppState *AppState
-	// TaskChan <-chan ScanTask
 }
 
 func (ba *BaseAgent) Run() {}
