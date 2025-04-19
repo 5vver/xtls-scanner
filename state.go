@@ -18,6 +18,7 @@ type ScanTask struct {
 	Type    string
 	Host    Host
 	Timeout int
+	Depth   int
 }
 
 type AppState struct {
@@ -25,6 +26,7 @@ type AppState struct {
 	AgentChans map[string]chan ScanTask
 	Host       Host
 	Timeout    int
+	Depth      int
 	Output     map[string]AgentOutput
 	Stop       bool
 }

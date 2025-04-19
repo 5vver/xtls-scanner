@@ -18,6 +18,7 @@ type Arguments struct {
 	Host        Host
 	Timeout     int
 	Verbose     bool
+	Depth       int
 }
 
 type IOAgent struct {
@@ -96,6 +97,7 @@ func ParseArguments() (Arguments, error) {
 	port := flag.Int("port", 443, "Target port")
 	timeout := flag.Int("timeout", 10, "Scan timeout")
 	verbose := flag.Bool("verbose", false, "Logging verbose level messages")
+	depth := flag.Int("depth", 10, "TLS ip addr traverse depth")
 
 	flag.Parse()
 
@@ -119,6 +121,7 @@ func ParseArguments() (Arguments, error) {
 		Host:        parsedHost,
 		Timeout:     *timeout,
 		Verbose:     *verbose,
+		Depth:       *depth,
 	}, nil
 }
 
@@ -141,6 +144,7 @@ func (io *IOAgent) Run() {
 			Type:    "ping",
 			Host:    args.Host,
 			Timeout: args.Timeout,
+			Depth:   args.Depth,
 		}
 		io.AppState.AddChanTask("ping", task)
 	}
@@ -150,6 +154,7 @@ func (io *IOAgent) Run() {
 			Type:    "tls",
 			Host:    args.Host,
 			Timeout: args.Timeout,
+			Depth:   args.Depth,
 		}
 		io.AppState.AddChanTask("tls", task)
 	}
@@ -159,6 +164,7 @@ func (io *IOAgent) Run() {
 			Type:    "sni",
 			Host:    args.Host,
 			Timeout: args.Timeout,
+			Depth:   args.Depth,
 		}
 		io.AppState.AddChanTask("sni", task)
 	}

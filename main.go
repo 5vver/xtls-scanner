@@ -1,12 +1,10 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
-
-	// "sync"
 	"syscall"
 )
 
@@ -31,7 +29,7 @@ func main() {
 
 	go func() {
 		<-sigChan
-		log.Println("Received shutdown signal")
+		slog.Debug("Received shutdown signal")
 		appState.mu.Lock()
 		appState.Stop = true
 		appState.mu.Unlock()
