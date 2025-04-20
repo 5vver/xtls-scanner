@@ -33,8 +33,8 @@ type AppState struct {
 
 func NewAppState() *AppState {
 	return &AppState{
-		AgentChans: make(map[string]chan ScanTask, 10),
-		OutputChan: make(chan AgentOutput),
+		AgentChans: make(map[string]chan ScanTask, 100),
+		OutputChan: make(chan AgentOutput, 100),
 	}
 }
 

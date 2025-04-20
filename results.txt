@@ -1,0 +1,2 @@
+host={<nil> 443 www.zanzu.nl} tasks=map[ping:true sni:false tcp:false]
+address="www.zanzu.nl" duplicates=0 loss=0 maxRtt=61.36ms stdDevRtt=1.666847ms sent=10 received=10 minRtt=55.282ms avgRtt=58.744297ms

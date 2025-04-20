@@ -179,8 +179,13 @@ func TlsScan(host Host, timeout int) (map[string]any, error) {
 		slog.Warn("TLS host is not feasible", "host_port", hostPort, "domain", domain)
 		feasible = false
 		result := map[string]any{
+			"ip":       host.IP.String(),
+			"host":     host.Origin,
+			"domain":   domain,
+			"issuers":  issuers,
+			"version":  state.Version,
+			"alpn":     alpn,
 			"feasible": feasible,
-			"result":   "not feasible",
 		}
 		return result, nil
 	} else {
@@ -189,8 +194,9 @@ func TlsScan(host Host, timeout int) (map[string]any, error) {
 			"host":     host.Origin,
 			"domain":   domain,
 			"issuers":  issuers,
+			"version":  state.Version,
+			"alpn":     alpn,
 			"feasible": feasible,
-			"result":   fmt.Sprintf("%s scan completed", "sni"),
 		}
 		return result, nil
 	}
@@ -246,11 +252,10 @@ func (ta *TLSAgent) Run(interval int) {
 					slog.Debug("TLS scan host", "host", host)
 					result, err := TlsScan(host, task.Timeout)
 					if err == nil {
-						ta.AppState.SetAgentOutput(ta.ID, AgentStatusRunning, result)
+						ta.AppState.SetAgentOutput(ta.ID, AgentStatusCompleted, result)
 					}
 				}
 
-				ta.AppState.SetAgentOutput(ta.ID, AgentStatusCompleted, nil)
 				slog.Info("TLS agent finished work")
 			}()
 		}

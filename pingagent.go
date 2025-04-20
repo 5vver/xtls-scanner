@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -69,13 +68,19 @@ func (pa *PingAgent) Run(interval int) {
 					pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
 			}
 			pinger.OnFinish = func(stats *probing.Statistics) {
-				pa.AppState.SetAgentOutput(pa.ID, AgentStatusCompleted, nil)
 				slog.Info("Ping agent finished work")
-				fmt.Printf("\n--- %s ping statistics ---\n", stats.Addr)
-				fmt.Printf("%d packets transmitted, %d packets received, %d duplicates, %v%% packet loss\n",
-					stats.PacketsSent, stats.PacketsRecv, stats.PacketsRecvDuplicates, stats.PacketLoss)
-				fmt.Printf("round-trip min/avg/max/stddev = %v/%v/%v/%v\n",
-					stats.MinRtt, stats.AvgRtt, stats.MaxRtt, stats.StdDevRtt)
+				result := map[string]any{
+					"address":    stats.Addr,
+					"sent":       stats.PacketsSent,
+					"received":   stats.PacketsRecv,
+					"duplicates": stats.PacketsRecvDuplicates,
+					"loss":       stats.PacketLoss,
+					"minRtt":     stats.MinRtt,
+					"maxRtt":     stats.MaxRtt,
+					"avgRtt":     stats.AvgRtt,
+					"stdDevRtt":  stats.StdDevRtt,
+				}
+				pa.AppState.SetAgentOutput(pa.ID, AgentStatusCompleted, result)
 			}
 
 			pinger.Count = -1

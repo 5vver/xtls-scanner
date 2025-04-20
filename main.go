@@ -9,6 +9,11 @@ import (
 )
 
 func main() {
+	// Set log level
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})))
+
 	appState := NewAppState()
 
 	ioAgent := NewIOAgent(appState)

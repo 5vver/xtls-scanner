@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/netip"
@@ -19,6 +20,7 @@ type Arguments struct {
 	Timeout     int
 	Verbose     bool
 	Depth       int
+	Out         string
 }
 
 type IOAgent struct {
@@ -98,6 +100,7 @@ func ParseArguments() (Arguments, error) {
 	timeout := flag.Int("timeout", 10, "Scan timeout")
 	verbose := flag.Bool("verbose", false, "Logging verbose level messages")
 	depth := flag.Int("depth", 10, "TLS ip addr crawl depth")
+	out := flag.String("out", "", "Output file")
 
 	flag.Parse()
 
@@ -122,19 +125,79 @@ func ParseArguments() (Arguments, error) {
 		Timeout:     *timeout,
 		Verbose:     *verbose,
 		Depth:       *depth,
+		Out:         *out,
 	}, nil
 }
 
-func (io *IOAgent) Run() {
-	slog.Info("Starting I/O Supervisor agent")
-	io.AppState.SetAgentOutput(io.ID, AgentStatusRunning, nil)
+func FormatResult(m map[string]any) string {
+	if len(m) == 0 {
+		return ""
+	}
 
+	pairs := make([]string, 0, len(m))
+	for k, v := range m {
+		var formattedValue string
+		switch val := v.(type) {
+		case string:
+			formattedValue = fmt.Sprintf("%q", val)
+		case nil:
+			formattedValue = "null"
+		default:
+			formattedValue = fmt.Sprintf("%v", val)
+		}
+		pairs = append(pairs, fmt.Sprintf("%s=%s", k, formattedValue))
+	}
+
+	return strings.Join(pairs, " ")
+}
+
+func ObserveOut(output chan AgentOutput, writer io.Writer) {
+	f, isFile := writer.(*os.File)
+	if isFile {
+		defer f.Close()
+	}
+
+	for out := range output {
+		if out.Status != AgentStatusCompleted {
+			continue
+		}
+		slog.Debug("Received output", "result", FormatResult(out.Data))
+		_, err := io.WriteString(writer, FormatResult(out.Data)+"\n")
+		if err != nil {
+			slog.Error("Error writing to file", "error", err)
+		}
+	}
+}
+
+func (ia *IOAgent) Run() {
+	slog.Info("Starting I/O Supervisor agent")
+
+	// io.AppState.SetAgentOutput(io.ID, AgentStatusRunning, nil)
 	args, err := ParseArguments()
 	if err != nil {
 		slog.Error("Error parsing arguments", "error", err)
-		io.AppState.SetAgentOutput(io.ID, AgentStatusFailed, map[string]any{"error": err.Error()})
+		ia.AppState.SetAgentOutput(ia.ID, AgentStatusFailed, map[string]any{"error": err.Error()})
 		return
 	}
+
+	// Set log level
+	if args.Verbose == false {
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		})))
+	}
+
+	outWriter := io.Discard
+	if args.Out != "" {
+		slog.Debug("Setting out writer", "out", args.Out)
+		f, err := os.OpenFile(args.Out, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			slog.Error("Error opening file", "path", args.Out)
+			return
+		}
+		outWriter = f
+	}
+	go ObserveOut(ia.AppState.OutputChan, outWriter)
 
 	slog.Info("Scheduling tasks for host", "host", args.Host.Origin)
 
@@ -146,7 +209,7 @@ func (io *IOAgent) Run() {
 			Timeout: args.Timeout,
 			Depth:   args.Depth,
 		}
-		io.AppState.AddChanTask("ping", task)
+		ia.AppState.AddChanTask("ping", task)
 	}
 	if args.TLSEnabled {
 		slog.Debug("Creating and adding task for tls agent")
@@ -156,7 +219,7 @@ func (io *IOAgent) Run() {
 			Timeout: args.Timeout,
 			Depth:   args.Depth,
 		}
-		io.AppState.AddChanTask("tls", task)
+		ia.AppState.AddChanTask("tls", task)
 	}
 	if args.SNIEnabled {
 		slog.Debug("Creating and adding task for sni agent")
@@ -166,21 +229,10 @@ func (io *IOAgent) Run() {
 			Timeout: args.Timeout,
 			Depth:   args.Depth,
 		}
-		io.AppState.AddChanTask("sni", task)
+		ia.AppState.AddChanTask("sni", task)
 	}
 
-	// Set log level
-	if args.Verbose {
-		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		})))
-	} else {
-		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelInfo,
-		})))
-	}
-
-	io.AppState.SetAgentOutput(io.ID, AgentStatusCompleted, map[string]any{
+	ia.AppState.SetAgentOutput(ia.ID, AgentStatusCompleted, map[string]any{
 		"host": args.Host,
 		"tasks": map[string]bool{
 			"sni":  args.SNIEnabled,
