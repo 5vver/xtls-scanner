@@ -1,17 +1,34 @@
 # XTLS Scanner
 
-## Key features
+## Run or build
 
-- Provided SNI scanner (checks ping from host to SNI to determine the best one)
-- Url scanner (test connection latency to Reality URL domain)
-- TCP scanner (test connection latency to your Xray core server)
-- Overall connection to address (IP, CIDR or domain)
-- Maybe add geo countries IsoCodes
+```bash
+# Run locally
+go run *.go
+# Or simply build to executable
+go build
+```
 
-## Agents
+## Usage
 
-- I/O supervisor scheduler agent: interacts with client and all the system agents.
-- Event handler agent: handles all the events and errors (on event or error puts events to app shared state pool).
-- SNI scanner agent: scans the SNI and checks the ping from host to SNI to determine the best one.
-- URL/TCP scanner agent: scans the URL and TCP connection to your Xray core server.
-- \*\* Reporter agent: basic logging, processes output data to user-friendly format.
+Run tls scanner locally to save your VPS address from being flagged
+
+```bash
+# Get help
+./xtls-scanner
+
+# Provide IP, CIDR or Hostname to ping
+./xtls-scanner -host host.exmple -ping
+
+# Set ping timeout amount (Default: 5)
+./xtls-scanner -host host.exmple -ping -timeout 2
+
+# Scan tls and enable crawl mode to look for subdomains starting from host target (if got handshake from host - automatically ping this host)
+./xtls-scanner -host host.exmple -tls
+
+# Specify tls crawl depth (Default: 10)
+./xtls-scanner -host host.exmple -tls -depth 20
+
+# Specify result file name
+./xtls-scanner -host host.exmple -tls -out result.txt
+```

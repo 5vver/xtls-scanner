@@ -169,11 +169,18 @@ func ObserveOut(output chan AgentOutput, writer io.Writer) {
 func (ia *IOAgent) Run() {
 	slog.Info("Starting I/O agent")
 
+	// Default logging
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelError,
+	})))
+
 	// io.AppState.SetAgentOutput(io.ID, AgentStatusRunning, nil)
 	args, err := ParseArguments()
 	if err != nil {
 		slog.Error("Error parsing arguments", "error", err)
+		flag.PrintDefaults()
 		ia.AppState.SetAgentOutput(ia.ID, AgentStatusFailed, map[string]any{"error": err.Error()})
+		ia.AppState.Stop = true
 		return
 	}
 
