@@ -68,7 +68,7 @@ func (pa *PingAgent) Run(interval int) {
 					pkt.Seq, "time", pkt.Rtt, "ttl", pkt.TTL)
 			}
 			pinger.OnFinish = func(stats *probing.Statistics) {
-				slog.Info("Ping agent finished work")
+				slog.Info("Ping agent finished work. Press Ctrl + C to stop agents")
 				result := map[string]any{
 					"address":    stats.Addr,
 					"sent":       stats.PacketsSent,

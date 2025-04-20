@@ -9,11 +9,6 @@ import (
 )
 
 func main() {
-	// Set log level
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelDebug,
-	})))
-
 	appState := NewAppState()
 
 	ioAgent := NewIOAgent(appState)
@@ -23,6 +18,7 @@ func main() {
 	var wg sync.WaitGroup
 	wg.Add(1)
 
+	// Agent tasks polling interval
 	const waitInterval int = 2
 
 	go ioAgent.Run()

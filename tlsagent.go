@@ -253,11 +253,19 @@ func (ta *TLSAgent) Run(interval int) {
 					result, err := TlsScan(host, task.Timeout)
 					if err == nil {
 						ta.AppState.SetAgentOutput(ta.ID, AgentStatusCompleted, result)
+						ta.AppState.AddChanTask("ping", ScanTask{
+							Type:    "ping",
+							Host:    host,
+							Timeout: task.Timeout,
+							Depth:   task.Depth,
+						})
 					}
 				}
 
-				slog.Info("TLS agent finished work")
+				slog.Info("TLS agent finished work. Press Ctrl + C to stop agents")
 			}()
+		case <-ticker.C:
+			slog.Debug("Tls agent no tasks available, waiting")
 		}
 	}
 }

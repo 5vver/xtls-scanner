@@ -1,2 +1,3 @@
-host={<nil> 443 www.zanzu.nl} tasks=map[ping:true sni:false tcp:false]
-address="www.zanzu.nl" duplicates=0 loss=0 maxRtt=61.36ms stdDevRtt=1.666847ms sent=10 received=10 minRtt=55.282ms avgRtt=58.744297ms
+agent="io" tasks=map[ping:false sni:false tcp:true] host={<nil> 443 www.zanzu.nl}
+agent="tls" version=772 alpn="h2" feasible=true ip="31.7.3.55" host="www.zanzu.nl" domain="server1.rutgers.cloud.shockmedia.nl" issuers="Let's Encrypt"
+agent="ping" address="www.zanzu.nl" loss=0 avgRtt=55.79ms sent=2 received=2 duplicates=0 minRtt=55.298ms maxRtt=56.282ms stdDevRtt=492µs

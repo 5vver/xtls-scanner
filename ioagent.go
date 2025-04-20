@@ -13,7 +13,6 @@ import (
 )
 
 type Arguments struct {
-	SNIEnabled  bool
 	TLSEnabled  bool
 	PingEnabled bool
 	Host        Host
@@ -30,7 +29,7 @@ type IOAgent struct {
 func NewIOAgent(appState *AppState) *IOAgent {
 	return &IOAgent{
 		BaseAgent: BaseAgent{
-			ID:       "io-supervisor",
+			ID:       "io",
 			AppState: appState,
 		},
 	}
@@ -92,12 +91,11 @@ func ParseHost(hostValue string, port int) (Host, error) {
 }
 
 func ParseArguments() (Arguments, error) {
-	sni := flag.Bool("sni", false, "Enable SNI scanning")
 	tls := flag.Bool("tls", false, "Enable TLS host scanning")
 	ping := flag.Bool("ping", false, "Enable Ping scanning")
 	host := flag.String("host", "", "Target IP, CIDR or hostname")
 	port := flag.Int("port", 443, "Target port")
-	timeout := flag.Int("timeout", 10, "Scan timeout")
+	timeout := flag.Int("timeout", 5, "Scan timeout")
 	verbose := flag.Bool("verbose", false, "Logging verbose level messages")
 	depth := flag.Int("depth", 10, "TLS ip addr crawl depth")
 	out := flag.String("out", "", "Output file")
@@ -108,7 +106,7 @@ func ParseArguments() (Arguments, error) {
 		return Arguments{}, fmt.Errorf("host is required")
 	}
 
-	if !*sni && !*tls && !*ping {
+	if !*tls && !*ping {
 		return Arguments{}, fmt.Errorf("at least one scan type (-sni, -tls, -ping) must be enabled")
 	}
 
@@ -118,7 +116,6 @@ func ParseArguments() (Arguments, error) {
 	}
 
 	return Arguments{
-		SNIEnabled:  *sni,
 		TLSEnabled:  *tls,
 		PingEnabled: *ping,
 		Host:        parsedHost,
@@ -161,8 +158,8 @@ func ObserveOut(output chan AgentOutput, writer io.Writer) {
 		if out.Status != AgentStatusCompleted {
 			continue
 		}
-		slog.Debug("Received output", "result", FormatResult(out.Data))
-		_, err := io.WriteString(writer, FormatResult(out.Data)+"\n")
+		slog.Info("Received output", "agent", out.ID, "result", FormatResult(out.Data))
+		_, err := io.WriteString(writer, fmt.Sprintf("agent=\"%s\" %s\n", out.ID, FormatResult(out.Data)))
 		if err != nil {
 			slog.Error("Error writing to file", "error", err)
 		}
@@ -170,7 +167,7 @@ func ObserveOut(output chan AgentOutput, writer io.Writer) {
 }
 
 func (ia *IOAgent) Run() {
-	slog.Info("Starting I/O Supervisor agent")
+	slog.Info("Starting I/O agent")
 
 	// io.AppState.SetAgentOutput(io.ID, AgentStatusRunning, nil)
 	args, err := ParseArguments()
@@ -221,21 +218,10 @@ func (ia *IOAgent) Run() {
 		}
 		ia.AppState.AddChanTask("tls", task)
 	}
-	if args.SNIEnabled {
-		slog.Debug("Creating and adding task for sni agent")
-		task := ScanTask{
-			Type:    "sni",
-			Host:    args.Host,
-			Timeout: args.Timeout,
-			Depth:   args.Depth,
-		}
-		ia.AppState.AddChanTask("sni", task)
-	}
 
 	ia.AppState.SetAgentOutput(ia.ID, AgentStatusCompleted, map[string]any{
 		"host": args.Host,
 		"tasks": map[string]bool{
-			"sni":  args.SNIEnabled,
 			"tcp":  args.TLSEnabled,
 			"ping": args.PingEnabled,
 		},
